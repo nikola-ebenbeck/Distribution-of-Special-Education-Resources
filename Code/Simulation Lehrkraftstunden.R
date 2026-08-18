@@ -39,15 +39,15 @@ data <- read.csv("model_0.csv")
 # Model 1 without Special Schools
 data_noSS <- function1("model_1a.csv")
 
-# Model 2 with some Special Schools
+# Model 2 with some Special School Types
 data_someSS <- function1("model_2a.csv")
 
 # Geodata of districts
-district <- st_read("Z:/2. Forschung/Daten und Codes/Schulstatistiken/Bayerndaten 2010 - 2020 alle Schulen/Geodaten/Verwaltungseinheiten Deutschland/vg250_ebenen_0101/VG250_KRS.shp") %>%
+district <- st_read("Z:/2. Forschung/Projekte/Inklusive Schulsysteme (Nikola Habil)/Schulstatistiken/Geodaten/Verwaltungseinheiten Deutschland/vg250_ebenen_0101/VG250_KRS.shp") %>%
   mutate(RS_Kreis = as.numeric(ARS)) %>% select(RS_Kreis, GEN, geometry)
 
 # Geodata of Bavaria
-bavaria <- st_read("Z:/2. Forschung/Daten und Codes/Schulstatistiken/Bayerndaten 2010 - 2020 alle Schulen/Geodaten/Verwaltungseinheiten Deutschland/Bundesländer_Ohne_Wasser.shp")
+bavaria <- st_read("Z:/2. Forschung/Projekte/Inklusive Schulsysteme (Nikola Habil)/Schulstatistiken/Geodaten/Verwaltungseinheiten Deutschland/Bundesländer_Ohne_Wasser.shp")
 
 # 2. Calculation of Special Education Teacher Hours ----------------------------
 
@@ -83,13 +83,13 @@ bavaria <- st_read("Z:/2. Forschung/Daten und Codes/Schulstatistiken/Bayerndaten
 229566 * 0.95
 # --> 218087.7 resulting teacher hours
 
-table(data_original$Schultyp)
+table(data$Schultyp)
   (30 +          # Behavior Disorder
     10 +         # Learning
     164 +        # SFZ
     7) / 350     # Speaking
-table(data_original$Schulart) # --> 350 Special Schools in Current System
-## --> 40% of Teachers work in a special school which stays in Model 2
+table(data$Schulart) # --> 350 Special Schools in Current System
+## --> 40% of special schools remain in Model 2
 
 # 3. Data Description ----------------------------------------------------------
 
@@ -137,7 +137,7 @@ model2 <- function2(data_someSS, propfac_2, 2)
 
 # 5. Matching Schools ----------------------------------------------------------
 
-# Greedy Algorithm per District [With some coding help from ChatGPT 4.0]
+# Greedy Algorithm per District
 function3 <- function(df, model = NULL) {
   # New empty list to save school pairs
   pairs <- list()
@@ -247,41 +247,8 @@ rm(x1, x2) # Remove unused dfs
 # 6. Plots ---------------------------------------------------------------------
 
 # Figure 1
-## Plot - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
-plot1 <- rbind(data.frame(
-  Schulnummer = model1$Schulnummer, sim = 0,
-  n_students_SEN_new = model1$n_students_SEN_old,
-  SN_KTYP4_ENG = model1$SN_KTYP4_ENG), 
-  model1 %>% select(Schulnummer,sim,n_students_SEN_new,SN_KTYP4_ENG), 
-  model2 %>% select(Schulnummer,sim,n_students_SEN_new,SN_KTYP4_ENG)) %>%
-  rename(n_students_SEN = n_students_SEN_new) %>% na.omit() %>%
-  mutate(system = case_when(
-    sim==0 ~ "current system", sim==1 ~ "model 1", sim==2 ~ "model 2")) %>%
-  # base boxplot
-  ggplot(aes(y=n_students_SEN, x=SN_KTYP4_ENG, fill=system)) +
-  geom_boxplot()+ theme_bw() + 
-  # legend and margins
-  theme(legend.position = "top", legend.justification = "left",
-        legend.margin = margin(5,0,0,0),
-        legend.box.margin = margin(-10,-10,-10,0),
-        axis.title.x = element_text(margin=margin(t=-5))) +
-  # labels and text
-  ylab("n students with SEN") +
-  xlab("district categories") + 
-  labs(subtitle=bold("Model comparison:")~
-         "Number of students with SEN at primary schools") +
-  scale_y_continuous("n students with SEN", breaks=seq(0, 200, 20)) +
-  # colors
-  scale_fill_manual(values=c("white", "grey75", "grey45"))
-plot1
 
-## Saving figure - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
-ggsave("H:/Daten/Bayern Daten/ZFE Artikel/Plot1.png", 
-       plot=plot1, width=20, heigh=10, units=c("cm"), dpi=1200)
-
-# Figure 2
-
-## Figure 2a - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+## Figure 1a - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 x <- models %>% left_join(district) %>% st_as_sf()
 y <- models %>% filter(Schulart == "Foerderzentren" & Schultyp != "Kranke") %>%
   select(system, lat, lon) %>% st_as_sf(coords = c("lon", "lat"), crs=4326)
@@ -292,14 +259,14 @@ plot2a <- ggplot() +
   # Points of Schools
   geom_sf(data=y, aes(geometry=geometry, color="")) +
   # legend, margins and style
-  labs(fill = "special educator hours", color="special school locations",
+  labs(fill = "weekly special education hours", color="special school locations",
        subtitle=bold("A:")~
-         "Spatial districution of special educator hours and special schools") + 
+         "Spatial distribution of weekly special education hours and special school locations") + 
   annotation_scale(location="br") +
+  theme_bw() +
   theme(legend.position = "bottom", legend.justification = "left",
         legend.key.width=unit(1, "cm")) +
   facet_grid(cols = vars(system)) +
-  theme_bw() +
   # labels and text
   guides(
     fill = guide_colorbar(title.position = "top", order=1, title.hjust = 0.5),
@@ -311,7 +278,7 @@ plot2a <- ggplot() +
     breaks=c(1000, 2000, 3000, 4000, 5000),
     labels=c("1000", "2000", "3000", "4000", "> 5000"))
 
-## Figure 2b - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+## Figure 1b - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 plot2b <- models %>%
   ggplot(aes(y=teacher_hours, x=SN_KTYP4_ENG, fill=system)) +
   geom_boxplot()+ theme_bw() + 
@@ -322,25 +289,47 @@ plot2b <- models %>%
         axis.title.x = element_text(margin=margin(t=-5)),
         plot.title = element_text(size=12, face="bold")) +
   # labels and text
-  ylab("n special educator hours") + xlab("district categories") + 
+  ylab("weekly special education hours") + xlab("district categories") + 
   labs(subtitle=bold("B:")~
-         "Special educator hours and full positions at primary schools") +
+         "Weekly special education hours") +
   guides(fill = guide_legend(title.position = "top", title.hjust = 0.5)) +
   # second y-axis
-  scale_y_continuous("N special educator hours", breaks = seq(0, 350, 50),
-                     sec.axis=sec_axis(~./26, name="N full special educators",
-                                       breaks = seq(0, 15, 1))) +
+  scale_y_continuous("weekly special education hours", breaks = seq(0, 350, 50)) +
   # colors & lines
   scale_fill_manual(values=c("grey80", "grey45")) +
   geom_hline(yintercept = 26, linetype = "dashed", color = "black")
 
 ## Combining and saving figures - - - - - - - - - - - - - - - - - - - - - - - - 
-plot2 <- plot2a/guide_area()/plot2b + 
+plot2 <- plot2a/guide_area()/(plot2b | plot2c) + 
   plot_layout(heights=c(1, 0.2, 1), guides="collect") &
   theme(legend.box="horizontal")
 
-ggsave("H:/Daten/Bayern Daten/ZFE Artikel/Plot2.png", 
-       plot=plot2, width=20, heigh=24, units=c("cm"), dpi=1200)
+plot2
+
+ggsave("Z:/2. Forschung/Projekte/Inklusive Schulsysteme (Nikola Habil)/Lehrerstunden Bayern (ZfE)/Abbildungen/Plot2.png", 
+       plot=plot2, width=21, heigh=24, units=c("cm"), dpi=1200)
+
+# Figure 2
+plot2c <- models %>%
+  mutate(demand = case_when(teacher_hours >=26 ~ "full position(s)", 
+                            teacher_hours < 26 ~ "no full position")) %>%
+  mutate(system = case_when(system == "Model 1" ~ "1", 
+                            system == "Model 2" ~ "2")) %>%
+  filter(!is.na(demand)) %>%
+  ggplot(aes(x = system, fill = demand)) +
+  facet_grid(cols = vars(SN_KTYP4_ENG)) +
+  geom_bar(position = "fill") +
+  scale_y_continuous(labels = scales::percent_format(),
+                     expand = c(0, 0))  +
+  labs(subtitle=bold("C:")~
+         "Special education positions") +
+  labs(y = "schools with (no) full position demand (%)", x = "Model") +
+  theme(legend.position = "bottom",
+        axis.title.x = element_text(margin=margin(t=-5))) +
+  scale_fill_manual(values=c("grey80", "grey45")) +
+  theme_bw()
+  
+plot2c
 
 # Figure 3
 
@@ -367,7 +356,7 @@ plot3a <- ggplot() +
   guides(fill = "none") + theme_bw() + annotation_scale() +
   theme(legend.position = "bottom") +
   scale_x_continuous(breaks=seq(11, 12, by=0.1)) +
-  scale_size_continuous(name = "special educator hours", guide = "legend",
+  scale_size_continuous(name = "weekly special education hours", guide = "legend",
                         breaks = c(10, 25, 50, 75, 100), limits=c(0, 200))
 
 ## Tirschenreuth: Model 1 - - - - - - - - - - - - - - - - - - - - - - - - - - -     
@@ -386,7 +375,7 @@ plot3b <- ggplot() +
   # Customized Theme
   guides(fill = "none") + theme_bw() + annotation_scale() +
   theme(legend.position = "bottom") +
-  scale_size_continuous(name = "special educator hours", guide = "legend",
+  scale_size_continuous(name = "weekly special education hours", guide = "legend",
                         breaks = c(10, 25, 50, 75, 100), limits=c(0, 200))
 
 ## Munich: Model 2 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -406,7 +395,7 @@ plot3c <- ggplot() +
   guides(fill = "none") + theme_bw() + annotation_scale() +
   theme(legend.position = "bottom") +
   scale_x_continuous(breaks=seq(11, 12, by=0.1)) +
-  scale_size_continuous(name = "special educator hours", guide = "legend",
+  scale_size_continuous(name = "weekly special education hours", guide = "legend",
                         breaks = c(10, 25, 50, 75, 100), limits=c(0, 200))
 
 ## Tirschenreuth: Model 2 - - - - - - - - - - - - - - - - - - - - - - - - - - -     
@@ -425,13 +414,13 @@ plot3d <- ggplot() +
   # Customized Theme
   guides(fill = "none") + theme_bw() + annotation_scale() +
   theme(legend.position = "bottom") +
-  scale_size_continuous(name = "special educator hours", guide = "legend",
+  scale_size_continuous(name = "weekly special education hours", guide = "legend",
                         breaks = c(10, 25, 50, 75, 100), limits=c(0, 200))
 
 plot3 <- plot3a+plot3b+plot3c+plot3d+plot_layout(guides = "collect", nrow=2) & 
   theme(legend.position='bottom')
 
-ggsave("H:/Daten/Bayern Daten/ZFE Artikel/Plot3.png", 
+ggsave("Z:/2. Forschung/Projekte/Inklusive Schulsysteme (Nikola Habil)/Lehrerstunden Bayern (ZfE)/Abbildungen/Plot3.png", 
        plot=plot3, width=25, heigh=18, units=c("cm"), dpi=1200)
 
 # Figure 4
@@ -536,14 +525,18 @@ models %>%
 # Hours demand of mobile schools
 summary(models %>% filter(sim == 1) %>% pull(sum_hours))
 summary(models %>% filter(sim == 2) %>% pull(sum_hours))
+sd(models %>% filter(sim == 1) %>% pull(sum_hours), na.rm=T)
+sd(models %>% filter(sim == 2) %>% pull(sum_hours), na.rm=T)
 
 # Distance between school pairs (km)
 summary(models %>% filter(sim == 1) %>% pull(dist_km))
+sd(models %>% filter(sim == 1) %>% pull(dist_km), na.rm=T)
 summary(models %>% filter(sim == 1 & SN_KTYP4_ENG == "urban districts") %>% pull(dist_km))
 summary(models %>% filter(sim == 1 & SN_KTYP4_ENG == "rural districts") %>% pull(dist_km))
 summary(models %>% filter(sim == 1 & SN_KTYP4_ENG == "sparsley\npopulated") %>% pull(dist_km))
 
 summary(models %>% filter(sim == 2) %>% pull(dist_km))
+sd(models %>% filter(sim == 2) %>% pull(dist_km), na.rm=T)
 summary(models %>% filter(sim == 2 & SN_KTYP4_ENG == "large cities") %>% pull(dist_km))
 summary(models %>% filter(sim == 2 & SN_KTYP4_ENG == "urban districts") %>% pull(dist_km))
 summary(models %>% filter(sim == 2 & SN_KTYP4_ENG == "rural districts") %>% pull(dist_km))
@@ -637,104 +630,3 @@ for (kreis in districts_unique) {
   ggsave(filename = paste0("Z:/2. Forschung/Projekte/Räumlich-Strukturelle Einflüsse auf Inklusion/Lehrerstunden Bayern (ZfE)/Karten alle Landkreise/Modell 2/", kreisname, "-", kreis, ".png"),
          plot = p, width = 20, height = 15, units=c("cm"), dpi = 500)
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-plot3 <- c %>% na.omit() %>%
-  ggplot(aes(x = as.factor(sim), fill = jobs)) + 
-  geom_bar(position="fill", color="black", alpha=0.7) +
-  facet_wrap(vars(SN_KTYP4_ENG), nrow=1) +
-  # legend, margins and style
-  theme_bw() +
-  theme(legend.position = "top", legend.justification = "left",
-        legend.margin = margin(5,0,0,0),
-        legend.box.margin = margin(-10,-10,-5,0)) +
-  scale_y_continuous(labels = scales::percent_format(accuracy = 1)) +
-  # labels and text
-  ylab("% of work arrangement ") +
-  xlab("simulation model") + 
-  labs(subtitle=bold("Model comparison:")~
-         "SEN teacher work arrangements in district types",
-       fill = "work arrangements") +
-  # colors
-  scale_fill_manual(values=c("grey5", "grey50", "grey80"))
-
-ggsave("H:/Daten/Bayern Daten/ZFE Artikel/Plot3.png", 
-       plot=plot3, width=20, heigh=10, units=c("cm"), dpi=1200)
-
-c1 <- filter(c, sim==1)
-c2 <- filter(c, sim==2)
-table(c1$jobs)
-table(c2$jobs)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
